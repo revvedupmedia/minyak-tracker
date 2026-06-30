@@ -41,11 +41,21 @@ function fmtDateLong(dateStr) {
   return d.toLocaleDateString("ms-MY", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function toLocalDateStr(d) {
+  // Format a Date as YYYY-MM-DD using LOCAL time fields, never UTC.
+  // (date.toISOString() converts to UTC first, which silently shifts
+  // the date by a day for timezones ahead of UTC — e.g. Malaysia UTC+8
+  // late at night — causing entries to land in the wrong month/day.)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function monthRange(date) {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const toISO = (d) => d.toISOString().slice(0, 10);
-  return { start: toISO(start), end: toISO(end) };
+  return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
 }
 
 function showToast(msg) {
@@ -271,7 +281,7 @@ function openAddDialog() {
   state.pendingFile = null;
   state.selectedFuel = "diesel";
   entryForm.reset();
-  document.getElementById("entryDate").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("entryDate").value = toLocalDateStr(new Date());
   setFuelToggle("diesel");
   resetDropZone();
   formError.hidden = true;
