@@ -23,7 +23,7 @@
 <!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
 
@@ -36,11 +36,11 @@
         <span class="brand-mark">⛽</span>
         <span class="brand-name">Minyak Tracker</span>
       </div>
-      <button id="monthLabel" class="month-switcher" aria-label="Tukar bulan">
-        <span class="chev" data-dir="-1">‹</span>
+      <div class="month-switcher">
+        <button type="button" class="chev" data-dir="-1" aria-label="Bulan sebelum">‹</button>
         <span id="monthText">Jun 2026</span>
-        <span class="chev" data-dir="1">›</span>
-      </button>
+        <button type="button" class="chev" data-dir="1" aria-label="Bulan seterusnya">›</button>
+      </div>
     </div>
   </header>
 
@@ -105,113 +105,109 @@
   </main>
 
   <!-- ===== FAB ===== -->
-  <button id="fabAdd" class="fab" aria-label="Tambah entry baru">+</button>
+  <button id="fabAdd" type="button" class="fab" aria-label="Tambah entry baru">+</button>
 
-  <!-- ===== Add/Edit Sheet ===== -->
-  <div id="sheetOverlay" class="sheet-overlay" hidden>
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-      <div class="sheet-handle"></div>
-      <div class="sheet-head">
-        <h2 id="sheetTitle">Tambah Entry</h2>
-        <button id="sheetClose" class="icon-btn" aria-label="Tutup">✕</button>
-      </div>
-
-      <form id="entryForm" class="entry-form">
-
-        <div class="field">
-          <label for="entryDate">Tarikh</label>
-          <input type="date" id="entryDate" required />
-        </div>
-
-        <div class="field">
-          <label>Jenis Minyak</label>
-          <div class="fuel-toggle" id="fuelToggle">
-            <button type="button" class="fuel-opt fuel-opt-diesel active" data-fuel="diesel">
-              <span class="fuel-dot dot-diesel"></span> Diesel
-            </button>
-            <button type="button" class="fuel-opt fuel-opt-ron" data-fuel="ron95">
-              <span class="fuel-dot dot-ron"></span> RON95 (Boat)
-            </button>
-          </div>
-        </div>
-
-        <div id="odoFields" class="odo-fields">
-          <div class="field-row">
-            <div class="field">
-              <label for="odoStart">Odometer Mula <span class="optional">(km)</span></label>
-              <input type="number" id="odoStart" inputmode="decimal" step="0.1" placeholder="12345" />
-            </div>
-            <div class="field">
-              <label for="odoEnd">Odometer Akhir <span class="optional">(km)</span></label>
-              <input type="number" id="odoEnd" inputmode="decimal" step="0.1" placeholder="12400" />
-            </div>
-          </div>
-          <div class="distance-preview" id="distancePreview" hidden>
-            Jarak: <strong id="distanceValue">0</strong> km
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="entryAmount">Amount Dibayar (RM)</label>
-          <input type="number" id="entryAmount" inputmode="decimal" step="0.01" placeholder="0.00" required />
-        </div>
-
-        <div class="field">
-          <label class="checkbox-field">
-            <input type="checkbox" id="needsClaim" />
-            <span>Perlu claim balik</span>
-          </label>
-        </div>
-
-        <div class="field">
-          <label for="entryNotes">Nota <span class="optional">(pilihan)</span></label>
-          <input type="text" id="entryNotes" placeholder="cth: trip ke pelabuhan" />
-        </div>
-
-        <div class="field">
-          <label>Resit <span class="optional">(gambar / PDF)</span></label>
-          <div id="dropZone" class="drop-zone">
-            <input type="file" id="receiptFile" accept="image/*,application/pdf" hidden />
-            <div id="dropZoneEmpty" class="drop-zone-empty">
-              <span class="drop-icon">📎</span>
-              <span>Tekan untuk upload resit</span>
-            </div>
-            <div id="dropZonePreview" class="drop-zone-preview" hidden>
-              <img id="previewImg" hidden />
-              <div id="previewPdf" class="preview-pdf" hidden>📄 <span id="previewPdfName"></span></div>
-              <button type="button" id="removeFile" class="remove-file" aria-label="Buang fail">✕</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="formError" class="form-error" hidden></div>
-
-        <button type="submit" id="submitBtn" class="submit-btn">Simpan Entry</button>
-      </form>
+  <!-- ===== Add Entry Dialog (native <dialog> — browser guarantees only one modal "top" state) ===== -->
+  <dialog id="addDialog" class="sheet-dialog">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Tambah Entry</h2>
+      <button type="button" id="addDialogClose" class="icon-btn" aria-label="Tutup">✕</button>
     </div>
-  </div>
 
-  <!-- ===== Entry Detail Sheet ===== -->
-  <div id="detailOverlay" class="sheet-overlay" hidden>
-    <div class="sheet" role="dialog" aria-modal="true">
-      <div class="sheet-handle"></div>
-      <div class="sheet-head">
-        <h2>Butiran Entry</h2>
-        <button id="detailClose" class="icon-btn" aria-label="Tutup">✕</button>
+    <form id="entryForm" class="entry-form" method="dialog">
+
+      <div class="field">
+        <label for="entryDate">Tarikh</label>
+        <input type="date" id="entryDate" required />
       </div>
-      <div id="detailBody" class="detail-body"></div>
-      <div class="detail-actions">
-        <button id="detailDelete" class="danger-btn">Padam Entry</button>
+
+      <div class="field">
+        <label>Jenis Minyak</label>
+        <div class="fuel-toggle" id="fuelToggle">
+          <button type="button" class="fuel-opt fuel-opt-diesel active" data-fuel="diesel">
+            <span class="fuel-dot dot-diesel"></span> Diesel
+          </button>
+          <button type="button" class="fuel-opt fuel-opt-ron" data-fuel="ron95">
+            <span class="fuel-dot dot-ron"></span> RON95 (Boat)
+          </button>
+        </div>
       </div>
+
+      <div id="odoFields" class="odo-fields">
+        <div class="field-row">
+          <div class="field">
+            <label for="odoStart">Odometer Mula <span class="optional">(km)</span></label>
+            <input type="number" id="odoStart" inputmode="decimal" step="0.1" placeholder="12345" />
+          </div>
+          <div class="field">
+            <label for="odoEnd">Odometer Akhir <span class="optional">(km)</span></label>
+            <input type="number" id="odoEnd" inputmode="decimal" step="0.1" placeholder="12400" />
+          </div>
+        </div>
+        <div class="distance-preview" id="distancePreview" hidden>
+          Jarak: <strong id="distanceValue">0</strong> km
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="entryAmount">Amount Dibayar (RM)</label>
+        <input type="number" id="entryAmount" inputmode="decimal" step="0.01" placeholder="0.00" required />
+      </div>
+
+      <div class="field">
+        <label class="checkbox-field">
+          <input type="checkbox" id="needsClaim" />
+          <span>Perlu claim balik</span>
+        </label>
+      </div>
+
+      <div class="field">
+        <label for="entryNotes">Nota <span class="optional">(pilihan)</span></label>
+        <input type="text" id="entryNotes" placeholder="cth: trip ke pelabuhan" />
+      </div>
+
+      <div class="field">
+        <label>Resit <span class="optional">(gambar / PDF)</span></label>
+        <div id="dropZone" class="drop-zone">
+          <input type="file" id="receiptFile" accept="image/*,application/pdf" hidden />
+          <div id="dropZoneEmpty" class="drop-zone-empty">
+            <span class="drop-icon">📎</span>
+            <span>Tekan untuk upload resit</span>
+          </div>
+          <div id="dropZonePreview" class="drop-zone-preview" hidden>
+            <img id="previewImg" hidden alt="Preview resit" />
+            <div id="previewPdf" class="preview-pdf" hidden>📄 <span id="previewPdfName"></span></div>
+            <button type="button" id="removeFile" class="remove-file" aria-label="Buang fail">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="formError" class="form-error" hidden></div>
+
+      <button type="button" id="submitBtn" class="submit-btn">Simpan Entry</button>
+    </form>
+  </dialog>
+
+  <!-- ===== Entry Detail Dialog ===== -->
+  <dialog id="detailDialog" class="sheet-dialog">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Butiran Entry</h2>
+      <button type="button" id="detailDialogClose" class="icon-btn" aria-label="Tutup">✕</button>
     </div>
-  </div>
+    <div id="detailBody" class="detail-body"></div>
+    <div class="detail-actions">
+      <button type="button" id="detailDelete" class="danger-btn">Padam Entry</button>
+    </div>
+  </dialog>
 
   <!-- Toast -->
   <div id="toast" class="toast" hidden></div>
 
 </div>
 
-<script src="config.js"></script>
-<script src="app.js"></script>
+<script src="config.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

@@ -1,5 +1,9 @@
 // ===========================================
-// Minyak Tracker - App Logic
+// Minyak Tracker - App Logic (v2 rebuild)
+// Uses native <dialog> elements for sheets — the browser itself
+// guarantees only one thing can be the active modal/top-layer element,
+// so the "two sheets open at once" class of bug structurally cannot
+// happen here the way it could with custom overlay divs.
 // ===========================================
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -10,11 +14,10 @@ const MONTH_NAMES = [
 ];
 
 let state = {
-  viewDate: new Date(), // first of month being viewed
+  viewDate: new Date(),
   entries: [],
   selectedFuel: "diesel",
   pendingFile: null,
-  editingId: null,
 };
 
 // ---------- Helpers ----------
@@ -82,8 +85,8 @@ function render() {
 }
 
 function renderMonthLabel() {
-  const el = document.getElementById("monthText");
-  el.textContent = `${MONTH_NAMES[state.viewDate.getMonth()]} ${state.viewDate.getFullYear()}`;
+  document.getElementById("monthText").textContent =
+    `${MONTH_NAMES[state.viewDate.getMonth()]} ${state.viewDate.getFullYear()}`;
 }
 
 function renderGauge() {
@@ -104,7 +107,6 @@ function sumBy(entries, fuelType, field) {
     .reduce((acc, e) => acc + Number(e[field] || 0), 0);
 }
 
-// Semi-circle gauge from 180deg to 0deg (left to right), split by proportion
 function drawGaugeArc(dieselVal, ronVal) {
   const cx = 120, cy = 130, r = 90;
   const total = dieselVal + ronVal;
@@ -122,7 +124,7 @@ function drawGaugeArc(dieselVal, ronVal) {
   }
 
   const dieselFrac = dieselVal / total;
-  const dieselEndAngle = 180 - (dieselFrac * 180); // sweeping from 180 to 0
+  const dieselEndAngle = 180 - (dieselFrac * 180);
 
   dieselPath.setAttribute("d", arcPath(cx, cy, r, 180, dieselEndAngle));
   ronPath.setAttribute("d", arcPath(cx, cy, r, dieselEndAngle, 0));
@@ -130,10 +132,7 @@ function drawGaugeArc(dieselVal, ronVal) {
 
 function polarToCartesian(cx, cy, r, angleDeg) {
   const angleRad = (angleDeg * Math.PI) / 180;
-  return {
-    x: cx + r * Math.cos(angleRad),
-    y: cy - r * Math.sin(angleRad),
-  };
+  return { x: cx + r * Math.cos(angleRad), y: cy - r * Math.sin(angleRad) };
 }
 
 function arcPath(cx, cy, r, startAngle, endAngle) {
@@ -145,7 +144,6 @@ function arcPath(cx, cy, r, startAngle, endAngle) {
 }
 
 function renderStats() {
-  // Mileage only counted for entries that have both odometer readings (driving, not boat)
   const totalKm = state.entries.reduce((acc, e) => acc + Number(e.distance_km || 0), 0);
   document.getElementById("statMileage").innerHTML = `${fmtKm(totalKm)} <span class="unit">km</span>`;
 
@@ -171,38 +169,43 @@ function renderHistory() {
   empty.hidden = true;
   count.textContent = `${state.entries.length} entry`;
 
-  for (const e of state.entries) {
+  for (const entry of state.entries) {
     const li = document.createElement("li");
-    li.className = "history-item";
-    li.dataset.id = e.id;
 
-    const isDiesel = e.fuel_type === "diesel";
+    const isDiesel = entry.fuel_type === "diesel";
     const badgeClass = isDiesel ? "diesel" : "ron";
     const badgeIcon = isDiesel ? "🚗" : "🚤";
     const fuelName = isDiesel ? "Diesel" : "RON95 (Boat)";
 
     let kmHtml = "";
-    if (e.distance_km) {
-      kmHtml = `<span class="h-km">${fmtKm(e.distance_km)} km</span>`;
+    if (entry.distance_km) {
+      kmHtml = `<span class="h-km">${fmtKm(entry.distance_km)} km</span>`;
     }
 
     let claimHtml = "";
-    if (e.needs_claim) {
-      const isClaimed = e.claim_status === "claimed";
+    if (entry.needs_claim) {
+      const isClaimed = entry.claim_status === "claimed";
       claimHtml = `<span class="h-claim-pill ${isClaimed ? "claimed" : "pending"}">${isClaimed ? "Dah Claim" : "Pending"}</span>`;
     }
 
-    const receiptDot = e.receipt_url ? `<span class="h-receipt-dot">📎</span>` : "";
+    const receiptDot = entry.receipt_url ? `<span class="h-receipt-dot">📎</span>` : "";
 
-    li.innerHTML = `
+    // Use a <button> instead of a generic <li> with a click listener —
+    // semantically correct (it IS an action trigger) and avoids any
+    // ambiguity around what counts as "the clickable thing".
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "history-item";
+
+    btn.innerHTML = `
       <div class="h-fuel-badge ${badgeClass}">${badgeIcon}</div>
       <div class="h-main">
         <div class="h-top">
           <span class="h-fuel-name">${fuelName}</span>
-          <span class="h-amount">${fmtRM(e.amount)}</span>
+          <span class="h-amount">${fmtRM(entry.amount)}</span>
         </div>
         <div class="h-bottom">
-          <span class="h-date">${fmtDateShort(e.entry_date)}</span>
+          <span class="h-date">${fmtDateShort(entry.entry_date)}</span>
           <div class="h-meta">
             ${kmHtml}
             ${receiptDot}
@@ -212,25 +215,27 @@ function renderHistory() {
       </div>
     `;
 
-    li.addEventListener("click", () => openDetail(e));
+    btn.addEventListener("click", () => openDetailDialog(entry));
+    li.appendChild(btn);
     list.appendChild(li);
   }
 }
 
 // ---------- Month navigation ----------
 document.querySelectorAll(".chev").forEach(chev => {
-  chev.addEventListener("click", (ev) => {
-    ev.stopPropagation();
+  chev.addEventListener("click", () => {
     const dir = parseInt(chev.dataset.dir, 10);
     state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + dir, 1);
     loadEntries();
   });
 });
 
-// ---------- Add Entry sheet ----------
-const sheetOverlay = document.getElementById("sheetOverlay");
+// ===========================================
+// Add Entry dialog
+// ===========================================
+const addDialog = document.getElementById("addDialog");
+const detailDialog = document.getElementById("detailDialog");
 const fabAdd = document.getElementById("fabAdd");
-const sheetClose = document.getElementById("sheetClose");
 const entryForm = document.getElementById("entryForm");
 const fuelToggle = document.getElementById("fuelToggle");
 const odoStart = document.getElementById("odoStart");
@@ -242,31 +247,38 @@ const receiptFile = document.getElementById("receiptFile");
 const formError = document.getElementById("formError");
 const submitBtn = document.getElementById("submitBtn");
 
-fabAdd.addEventListener("click", () => openAddSheet());
-sheetClose.addEventListener("click", () => closeSheet());
-sheetOverlay.addEventListener("click", (e) => {
-  if (e.target === sheetOverlay) closeSheet();
+fabAdd.addEventListener("click", openAddDialog);
+document.getElementById("addDialogClose").addEventListener("click", () => addDialog.close());
+document.getElementById("detailDialogClose").addEventListener("click", () => detailDialog.close());
+
+// Click on the ::backdrop area (outside the sheet content) closes the dialog.
+// With <dialog>, a click that lands on the dialog element itself (not its
+// children) means it landed on the backdrop region.
+addDialog.addEventListener("click", (e) => {
+  if (e.target === addDialog) addDialog.close();
+});
+detailDialog.addEventListener("click", (e) => {
+  if (e.target === detailDialog) detailDialog.close();
 });
 
-function openAddSheet() {
-  detailOverlay.hidden = true; // ensure the other sheet is never open at the same time
-  state.editingId = null;
+function openAddDialog() {
+  // showModal() on a <dialog> automatically makes it THE top-layer modal.
+  // If detailDialog happens to be open, close it first — but structurally,
+  // two <dialog> elements cannot both be "open as modal and interactive"
+  // in a way that lets clicks leak between them, unlike plain divs.
+  if (detailDialog.open) detailDialog.close();
+
   state.pendingFile = null;
   state.selectedFuel = "diesel";
   entryForm.reset();
-  document.getElementById("sheetTitle").textContent = "Tambah Entry";
   document.getElementById("entryDate").value = new Date().toISOString().slice(0, 10);
   setFuelToggle("diesel");
   resetDropZone();
   formError.hidden = true;
+  submitBtn.disabled = false;
   submitBtn.textContent = "Simpan Entry";
-  sheetOverlay.hidden = false;
-  document.body.classList.add("sheet-open");
-}
 
-function closeSheet() {
-  sheetOverlay.hidden = true;
-  document.body.classList.remove("sheet-open");
+  addDialog.showModal();
 }
 
 function setFuelToggle(fuel) {
@@ -343,8 +355,7 @@ function showFilePreview(file) {
 }
 
 // ---------- Form submit ----------
-entryForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
+submitBtn.addEventListener("click", async () => {
   formError.hidden = true;
   submitBtn.disabled = true;
   submitBtn.textContent = "Menyimpan...";
@@ -376,10 +387,7 @@ entryForm.addEventListener("submit", async (e) => {
       const ext = file.name.split(".").pop();
       const path = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-      const { error: uploadError } = await sb.storage
-        .from("receipts")
-        .upload(path, file);
-
+      const { error: uploadError } = await sb.storage.from("receipts").upload(path, file);
       if (uploadError) throw new Error("Gagal upload resit: " + uploadError.message);
 
       const { data: urlData } = sb.storage.from("receipts").getPublicUrl(path);
@@ -407,7 +415,7 @@ entryForm.addEventListener("submit", async (e) => {
     const { error: insertError } = await sb.from("fuel_entries").insert(payload);
     if (insertError) throw new Error(insertError.message);
 
-    closeSheet();
+    addDialog.close();
     showToast("Entry disimpan ✓");
     await loadEntries();
 
@@ -420,20 +428,16 @@ entryForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- Detail sheet ----------
-const detailOverlay = document.getElementById("detailOverlay");
-const detailClose = document.getElementById("detailClose");
+// ===========================================
+// Detail dialog
+// ===========================================
 const detailBody = document.getElementById("detailBody");
 const detailDelete = document.getElementById("detailDelete");
 let currentDetailEntry = null;
 
-detailClose.addEventListener("click", () => { detailOverlay.hidden = true; document.body.classList.remove("sheet-open"); });
-detailOverlay.addEventListener("click", (e) => {
-  if (e.target === detailOverlay) { detailOverlay.hidden = true; document.body.classList.remove("sheet-open"); }
-});
+function openDetailDialog(entry) {
+  if (addDialog.open) addDialog.close();
 
-function openDetail(entry) {
-  sheetOverlay.hidden = true; // ensure the other sheet is never open at the same time
   currentDetailEntry = entry;
   const isDiesel = entry.fuel_type === "diesel";
 
@@ -472,10 +476,10 @@ function openDetail(entry) {
 
   detailBody.innerHTML = rows.join("") + receiptHtml;
 
-  // Add claim toggle action if applicable
   if (entry.needs_claim) {
     const isClaimed = entry.claim_status === "claimed";
     const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
     toggleBtn.className = "detail-receipt-link";
     toggleBtn.style.cssText = "margin-top:8px; width:100%; border:none; background:var(--success-soft); color:var(--success); cursor:pointer;";
     toggleBtn.textContent = isClaimed ? "Tandakan sebagai Pending" : "Tandakan sebagai Dah Claim";
@@ -483,8 +487,7 @@ function openDetail(entry) {
       const newStatus = isClaimed ? "pending" : "claimed";
       const { error } = await sb.from("fuel_entries").update({ claim_status: newStatus }).eq("id", entry.id);
       if (!error) {
-        detailOverlay.hidden = true;
-        document.body.classList.remove("sheet-open");
+        detailDialog.close();
         showToast("Status dikemaskini ✓");
         loadEntries();
       }
@@ -492,8 +495,7 @@ function openDetail(entry) {
     detailBody.appendChild(toggleBtn);
   }
 
-  detailOverlay.hidden = false;
-  document.body.classList.add("sheet-open");
+  detailDialog.showModal();
 }
 
 function row(label, value, mono = false) {
@@ -509,7 +511,6 @@ detailDelete.addEventListener("click", async () => {
 
   const entry = currentDetailEntry;
 
-  // Delete receipt from storage if exists
   if (entry.receipt_path) {
     await sb.storage.from("receipts").remove([entry.receipt_path]);
   }
@@ -520,8 +521,7 @@ detailDelete.addEventListener("click", async () => {
     return;
   }
 
-  detailOverlay.hidden = true;
-  document.body.classList.remove("sheet-open");
+  detailDialog.close();
   showToast("Entry dipadam");
   loadEntries();
 });
