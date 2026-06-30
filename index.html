@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Minyak Tracker</title>
+<meta name="description" content="Track mileage & minyak harian — diesel dan RON95, sekali dengan resit." />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#FAF8F4" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Minyak" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== Header ===== -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">⛽</span>
+        <span class="brand-name">Minyak Tracker</span>
+      </div>
+      <button id="monthLabel" class="month-switcher" aria-label="Tukar bulan">
+        <span class="chev" data-dir="-1">‹</span>
+        <span id="monthText">Jun 2026</span>
+        <span class="chev" data-dir="1">›</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- ===== Hero: fuel gauge arc ===== -->
+    <section class="hero-card" aria-label="Ringkasan bulan ini">
+      <div class="gauge-wrap">
+        <svg id="gaugeSvg" viewBox="0 0 240 150" class="gauge-svg" role="img" aria-label="Pecahan perbelanjaan diesel vs RON95">
+          <path id="gaugeTrack" d="" class="gauge-track"/>
+          <path id="gaugeDiesel" d="" class="gauge-seg gauge-diesel"/>
+          <path id="gaugeRon" d="" class="gauge-seg gauge-ron"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-total" id="gaugeTotal">RM0</div>
+          <div class="gauge-sub">jumlah bulan ini</div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="dot dot-diesel"></span>
+          <span class="legend-label">Diesel</span>
+          <span class="legend-value" id="dieselTotal">RM0</span>
+        </div>
+        <div class="legend-item">
+          <span class="dot dot-ron"></span>
+          <span class="legend-label">RON95 (Boat)</span>
+          <span class="legend-value" id="ronTotal">RM0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Stat cards ===== -->
+    <section class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Jumlah Mileage</div>
+        <div class="stat-value mono" id="statMileage">0 <span class="unit">km</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Belum Claim</div>
+        <div class="stat-value mono" id="statPending">RM0</div>
+      </div>
+    </section>
+
+    <!-- ===== History ===== -->
+    <section class="history-section">
+      <div class="history-head">
+        <h2>Rekod</h2>
+        <span class="history-count" id="historyCount"></span>
+      </div>
+
+      <div id="emptyState" class="empty-state" hidden>
+        <div class="empty-icon">📋</div>
+        <p class="empty-title">Takde rekod bulan ni</p>
+        <p class="empty-sub">Tekan butang + untuk tambah entry pertama awak.</p>
+      </div>
+
+      <ul id="historyList" class="history-list"></ul>
+    </section>
+
+  </main>
+
+  <!-- ===== FAB ===== -->
+  <button id="fabAdd" class="fab" aria-label="Tambah entry baru">+</button>
+
+  <!-- ===== Add/Edit Sheet ===== -->
+  <div id="sheetOverlay" class="sheet-overlay" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="sheetTitle">Tambah Entry</h2>
+        <button id="sheetClose" class="icon-btn" aria-label="Tutup">✕</button>
+      </div>
+
+      <form id="entryForm" class="entry-form">
+
+        <div class="field">
+          <label for="entryDate">Tarikh</label>
+          <input type="date" id="entryDate" required />
+        </div>
+
+        <div class="field">
+          <label>Jenis Minyak</label>
+          <div class="fuel-toggle" id="fuelToggle">
+            <button type="button" class="fuel-opt fuel-opt-diesel active" data-fuel="diesel">
+              <span class="fuel-dot dot-diesel"></span> Diesel
+            </button>
+            <button type="button" class="fuel-opt fuel-opt-ron" data-fuel="ron95">
+              <span class="fuel-dot dot-ron"></span> RON95 (Boat)
+            </button>
+          </div>
+        </div>
+
+        <div id="odoFields" class="odo-fields">
+          <div class="field-row">
+            <div class="field">
+              <label for="odoStart">Odometer Mula <span class="optional">(km)</span></label>
+              <input type="number" id="odoStart" inputmode="decimal" step="0.1" placeholder="12345" />
+            </div>
+            <div class="field">
+              <label for="odoEnd">Odometer Akhir <span class="optional">(km)</span></label>
+              <input type="number" id="odoEnd" inputmode="decimal" step="0.1" placeholder="12400" />
+            </div>
+          </div>
+          <div class="distance-preview" id="distancePreview" hidden>
+            Jarak: <strong id="distanceValue">0</strong> km
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="entryAmount">Amount Dibayar (RM)</label>
+          <input type="number" id="entryAmount" inputmode="decimal" step="0.01" placeholder="0.00" required />
+        </div>
+
+        <div class="field">
+          <label class="checkbox-field">
+            <input type="checkbox" id="needsClaim" />
+            <span>Perlu claim balik</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="entryNotes">Nota <span class="optional">(pilihan)</span></label>
+          <input type="text" id="entryNotes" placeholder="cth: trip ke pelabuhan" />
+        </div>
+
+        <div class="field">
+          <label>Resit <span class="optional">(gambar / PDF)</span></label>
+          <div id="dropZone" class="drop-zone">
+            <input type="file" id="receiptFile" accept="image/*,application/pdf" hidden />
+            <div id="dropZoneEmpty" class="drop-zone-empty">
+              <span class="drop-icon">📎</span>
+              <span>Tekan untuk upload resit</span>
+            </div>
+            <div id="dropZonePreview" class="drop-zone-preview" hidden>
+              <img id="previewImg" hidden />
+              <div id="previewPdf" class="preview-pdf" hidden>📄 <span id="previewPdfName"></span></div>
+              <button type="button" id="removeFile" class="remove-file" aria-label="Buang fail">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="formError" class="form-error" hidden></div>
+
+        <button type="submit" id="submitBtn" class="submit-btn">Simpan Entry</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== Entry Detail Sheet ===== -->
+  <div id="detailOverlay" class="sheet-overlay" hidden>
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2>Butiran Entry</h2>
+        <button id="detailClose" class="icon-btn" aria-label="Tutup">✕</button>
+      </div>
+      <div id="detailBody" class="detail-body"></div>
+      <div class="detail-actions">
+        <button id="detailDelete" class="danger-btn">Padam Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
