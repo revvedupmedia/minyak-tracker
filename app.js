@@ -108,6 +108,12 @@ function onLoggedIn(user) {
 function onLoggedOut() {
   state.currentUser = null;
   state.isAdmin = false;
+  // Clear admin badge
+  document.getElementById("adminBadge").hidden = true;
+  // Clear the "was shown" flag so animation plays again on next login
+  const appEl = document.getElementById("app");
+  delete appEl.dataset.wasShown;
+  appEl.hidden = true;
   showLoginScreen();
 }
 
