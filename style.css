@@ -720,3 +720,85 @@ dialog.sheet-dialog::backdrop { background: rgba(10,40,40,0.55); }
   dialog.sheet-dialog, .toast, .gauge-seg,
   .login-logo, #loginSuccess, .login-card { animation: none; transition: none; }
 }
+
+/* =============================================
+   CANVAS BACKGROUND + GLASS UI
+   ============================================= */
+#bgCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+#loginScreen,
+#loginSuccess,
+#app,
+dialog.sheet-dialog {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass morphism for cards — so canvas shows through beautifully */
+.hero-card {
+  background: linear-gradient(135deg, rgba(14,110,110,0.82) 0%, rgba(26,155,138,0.82) 100%) !important;
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.stat-card {
+  background: rgba(255,255,255,0.12) !important;
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: white;
+}
+
+.stat-label { color: rgba(255,255,255,0.7) !important; }
+.stat-value { color: white !important; }
+.stat-value .unit { color: rgba(255,255,255,0.6) !important; }
+
+.history-section .history-head h2 { color: white; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.history-count { color: rgba(255,255,255,0.6) !important; }
+
+.history-item {
+  background: rgba(255,255,255,0.11) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.h-fuel-name { color: white !important; }
+.h-amount { color: white !important; }
+.h-date { color: rgba(255,255,255,0.6) !important; }
+.h-owner { color: rgba(255,255,255,0.45) !important; }
+.h-fuel-badge.diesel { background: rgba(14,110,110,0.5) !important; }
+.h-fuel-badge.ron { background: rgba(26,155,138,0.5) !important; }
+
+.topbar {
+  background: rgba(10,30,30,0.65) !important;
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+.brand-name { color: white !important; }
+.month-switcher {
+  background: rgba(255,255,255,0.12) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  color: white !important;
+}
+.chev { color: rgba(255,255,255,0.6) !important; }
+.user-email { color: rgba(255,255,255,0.5) !important; }
+.logout-btn { border-color: rgba(255,255,255,0.2) !important; color: rgba(255,255,255,0.6) !important; }
+
+.empty-state { color: rgba(255,255,255,0.5) !important; }
+.empty-title { color: rgba(255,255,255,0.8) !important; }
+
+/* Login screen still has its own solid background */
+#loginScreen { z-index: 100 !important; }
+#loginSuccess { z-index: 200 !important; }
+dialog.sheet-dialog { z-index: 50 !important; }
+dialog.sheet-dialog::backdrop { background: rgba(0,10,20,0.7) !important; }
