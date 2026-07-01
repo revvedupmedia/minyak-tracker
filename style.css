@@ -498,3 +498,104 @@ dialog.sheet-dialog::backdrop {
 @media (prefers-reduced-motion: reduce) {
   dialog.sheet-dialog, .toast, .gauge-seg { animation: none; transition: none; }
 }
+
+/* ===== LOGIN SCREEN ===== */
+.login-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 36px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.login-logo {
+  font-size: 44px;
+  display: block;
+  margin-bottom: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.login-sub {
+  font-size: 13.5px;
+  color: var(--caption);
+  margin: 0;
+}
+
+/* ===== USER BAR ===== */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.user-email {
+  font-size: 12px;
+  color: var(--caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+/* ===== ADMIN BADGE ===== */
+.admin-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--diesel);
+  color: white;
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+  margin-left: 4px;
+}
+
+/* ===== ADMIN DIALOG ===== */
+.admin-dialog {
+  max-height: 60vh;
+}
+
+/* ===== ENTRY OWNER TAG ===== */
+.h-owner {
+  font-size: 10.5px;
+  color: var(--caption);
+  margin-top: 2px;
+}

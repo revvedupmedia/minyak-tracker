@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Minyak Tracker</title>
 <meta name="description" content="Track mileage & minyak harian — diesel dan RON95, sekali dengan resit." />
-
-<!-- PWA -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#FAF8F4" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,42 +12,79 @@
 <meta name="apple-mobile-web-app-title" content="Minyak" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="icon" href="icons/icon-192.png" />
-
-<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-<!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 
-<div id="app">
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="loginScreen" class="login-screen" hidden>
+  <div class="login-card">
+    <div class="login-brand">
+      <span id="loginLogo" class="login-logo">⛽</span>
+      <h1 class="login-title">Minyak Tracker</h1>
+      <p class="login-sub">Log masuk untuk teruskan</p>
+    </div>
+    <div class="field">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="email@contoh.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div id="loginError" class="form-error" hidden></div>
+    <button type="button" id="loginBtn" class="submit-btn">Log Masuk</button>
+  </div>
+</div>
 
-  <!-- ===== Header ===== -->
+<!-- ===== ADMIN PASSWORD DIALOG ===== -->
+<dialog id="adminDialog" class="sheet-dialog admin-dialog">
+  <div class="sheet-head">
+    <h2>🔐 Admin Mode</h2>
+    <button type="button" id="adminDialogClose" class="icon-btn">✕</button>
+  </div>
+  <div style="padding: 0 20px 24px; display:flex; flex-direction:column; gap:14px;">
+    <p style="margin:0; font-size:13.5px; color:var(--caption);">Masukkan password admin untuk aktifkan admin mode.</p>
+    <div class="field">
+      <label for="adminPassword">Password Admin</label>
+      <input type="password" id="adminPassword" placeholder="••••••••" />
+    </div>
+    <div id="adminError" class="form-error" hidden>Password salah.</div>
+    <button type="button" id="adminUnlockBtn" class="submit-btn">Unlock Admin Mode</button>
+  </div>
+</dialog>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app" hidden>
+
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span class="brand-mark">⛽</span>
+        <span id="appLogo" class="brand-mark">⛽</span>
         <span class="brand-name">Minyak Tracker</span>
+        <span id="adminBadge" class="admin-badge" hidden>ADMIN</span>
       </div>
       <div class="month-switcher">
-        <button type="button" class="chev" data-dir="-1" aria-label="Bulan sebelum">‹</button>
+        <button type="button" class="chev" data-dir="-1">‹</button>
         <span id="monthText">Jun 2026</span>
-        <button type="button" class="chev" data-dir="1" aria-label="Bulan seterusnya">›</button>
+        <button type="button" class="chev" data-dir="1">›</button>
       </div>
+    </div>
+    <div class="user-bar">
+      <span id="userEmailDisplay" class="user-email"></span>
+      <button type="button" id="logoutBtn" class="logout-btn">Log Keluar</button>
     </div>
   </header>
 
   <main class="content">
 
-    <!-- ===== Hero: fuel gauge arc ===== -->
-    <section class="hero-card" aria-label="Ringkasan bulan ini">
+    <section class="hero-card">
       <div class="gauge-wrap">
-        <svg id="gaugeSvg" viewBox="0 0 240 150" class="gauge-svg" role="img" aria-label="Pecahan perbelanjaan diesel vs RON95">
+        <svg id="gaugeSvg" viewBox="0 0 240 150" class="gauge-svg">
           <path id="gaugeTrack" d="" class="gauge-track"/>
           <path id="gaugeDiesel" d="" class="gauge-seg gauge-diesel"/>
           <path id="gaugeRon" d="" class="gauge-seg gauge-ron"/>
@@ -59,7 +94,6 @@
           <div class="gauge-sub">jumlah bulan ini</div>
         </div>
       </div>
-
       <div class="legend">
         <div class="legend-item">
           <span class="dot dot-diesel"></span>
@@ -74,7 +108,6 @@
       </div>
     </section>
 
-    <!-- ===== Stat cards ===== -->
     <section class="stat-grid">
       <div class="stat-card">
         <div class="stat-label">Jumlah Mileage</div>
@@ -86,42 +119,35 @@
       </div>
     </section>
 
-    <!-- ===== History ===== -->
     <section class="history-section">
       <div class="history-head">
         <h2>Rekod</h2>
         <span class="history-count" id="historyCount"></span>
       </div>
-
       <div id="emptyState" class="empty-state" hidden>
         <div class="empty-icon">📋</div>
         <p class="empty-title">Takde rekod bulan ni</p>
         <p class="empty-sub">Tekan butang + untuk tambah entry pertama awak.</p>
       </div>
-
       <ul id="historyList" class="history-list"></ul>
     </section>
 
   </main>
 
-  <!-- ===== FAB ===== -->
-  <button id="fabAdd" type="button" class="fab" aria-label="Tambah entry baru">+</button>
+  <button id="fabAdd" type="button" class="fab">+</button>
 
-  <!-- ===== Add Entry Dialog (native <dialog> — browser guarantees only one modal "top" state) ===== -->
+  <!-- Add Entry Dialog -->
   <dialog id="addDialog" class="sheet-dialog">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <h2>Tambah Entry</h2>
-      <button type="button" id="addDialogClose" class="icon-btn" aria-label="Tutup">✕</button>
+      <button type="button" id="addDialogClose" class="icon-btn">✕</button>
     </div>
-
     <form id="entryForm" class="entry-form" method="dialog">
-
       <div class="field">
         <label for="entryDate">Tarikh</label>
         <input type="date" id="entryDate" required />
       </div>
-
       <div class="field">
         <label>Jenis Minyak</label>
         <div class="fuel-toggle" id="fuelToggle">
@@ -133,7 +159,6 @@
           </button>
         </div>
       </div>
-
       <div id="odoFields" class="odo-fields">
         <div class="field-row">
           <div class="field">
@@ -149,24 +174,20 @@
           Jarak: <strong id="distanceValue">0</strong> km
         </div>
       </div>
-
       <div class="field">
         <label for="entryAmount">Amount Dibayar (RM)</label>
         <input type="number" id="entryAmount" inputmode="decimal" step="0.01" placeholder="0.00" required />
       </div>
-
       <div class="field">
         <label class="checkbox-field">
           <input type="checkbox" id="needsClaim" />
           <span>Perlu claim balik</span>
         </label>
       </div>
-
       <div class="field">
         <label for="entryNotes">Nota <span class="optional">(pilihan)</span></label>
         <input type="text" id="entryNotes" placeholder="cth: trip ke pelabuhan" />
       </div>
-
       <div class="field">
         <label>Resit <span class="optional">(gambar / PDF)</span></label>
         <div id="dropZone" class="drop-zone">
@@ -176,38 +197,32 @@
             <span>Tekan untuk upload resit</span>
           </div>
           <div id="dropZonePreview" class="drop-zone-preview" hidden>
-            <img id="previewImg" hidden alt="Preview resit" />
+            <img id="previewImg" hidden alt="Preview" />
             <div id="previewPdf" class="preview-pdf" hidden>📄 <span id="previewPdfName"></span></div>
-            <button type="button" id="removeFile" class="remove-file" aria-label="Buang fail">✕</button>
+            <button type="button" id="removeFile" class="remove-file">✕</button>
           </div>
         </div>
       </div>
-
       <div id="formError" class="form-error" hidden></div>
-
       <button type="button" id="submitBtn" class="submit-btn">Simpan Entry</button>
     </form>
   </dialog>
 
-  <!-- ===== Entry Detail Dialog ===== -->
+  <!-- Detail Dialog -->
   <dialog id="detailDialog" class="sheet-dialog">
     <div class="sheet-handle"></div>
     <div class="sheet-head">
       <h2>Butiran Entry</h2>
-      <button type="button" id="detailDialogClose" class="icon-btn" aria-label="Tutup">✕</button>
+      <button type="button" id="detailDialogClose" class="icon-btn">✕</button>
     </div>
     <div id="detailBody" class="detail-body"></div>
-    <div class="detail-actions">
-      <button type="button" id="detailDelete" class="danger-btn">Padam Entry</button>
-    </div>
+    <div class="detail-actions" id="detailActions"></div>
   </dialog>
 
-  <!-- Toast -->
   <div id="toast" class="toast" hidden></div>
-
 </div>
 
-<script src="config.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="config.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
