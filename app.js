@@ -77,10 +77,32 @@ function showLoginScreen() {
 
 function onLoggedIn(user) {
   state.currentUser = user;
-  document.getElementById("loginScreen").hidden = true;
-  document.getElementById("app").hidden = false;
-  document.getElementById("userEmailDisplay").textContent = user.email;
-  loadEntries();
+
+  // Show turtle success animation, then reveal app
+  const loginScreen = document.getElementById("loginScreen");
+  const successScreen = document.getElementById("loginSuccess");
+  const appEl = document.getElementById("app");
+
+  loginScreen.hidden = true;
+
+  // Only show animation if coming from a fresh login (not a page refresh)
+  if (!appEl.dataset.wasShown) {
+    successScreen.hidden = false;
+    appEl.hidden = true;
+    // After animation finishes (1.6s + 0.4s fade = 2s total), hide overlay and show app
+    setTimeout(() => {
+      successScreen.hidden = true;
+      appEl.hidden = false;
+      appEl.dataset.wasShown = "1";
+      document.getElementById("userEmailDisplay").textContent = user.email;
+      loadEntries();
+    }, 2000);
+  } else {
+    successScreen.hidden = true;
+    appEl.hidden = false;
+    document.getElementById("userEmailDisplay").textContent = user.email;
+    loadEntries();
+  }
 }
 
 function onLoggedOut() {

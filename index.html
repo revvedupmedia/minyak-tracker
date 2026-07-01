@@ -3,29 +3,26 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Minyak Tracker</title>
-<meta name="description" content="Track mileage & minyak harian — diesel dan RON95, sekali dengan resit." />
+<title>Minyak Tracker — Lembaga Pengurusan Penyu</title>
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#FAF8F4" />
+<meta name="theme-color" content="#0E6E6E" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Minyak" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="icon" href="icons/icon-192.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
 
-<!-- ===== LOGIN SCREEN ===== -->
-<div id="loginScreen" class="login-screen" hidden>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" hidden>
   <div class="login-card">
     <div class="login-brand">
-      <span id="loginLogo" class="login-logo">⛽</span>
+      <span id="loginLogo" class="login-logo">🐢</span>
       <h1 class="login-title">Minyak Tracker</h1>
+      <p class="login-org">Lembaga Pengurusan Penyu</p>
       <p class="login-sub">Log masuk untuk teruskan</p>
     </div>
     <div class="field">
@@ -41,36 +38,44 @@
   </div>
 </div>
 
-<!-- ===== ADMIN PASSWORD DIALOG ===== -->
+<!-- LOGIN SUCCESS ANIMATION -->
+<div id="loginSuccess" hidden>
+  <div class="success-wave"></div>
+  <div class="success-turtle">🐢</div>
+  <div class="success-text">Selamat datang!</div>
+</div>
+
+<!-- ADMIN PASSWORD DIALOG -->
 <dialog id="adminDialog" class="sheet-dialog admin-dialog">
+  <div class="sheet-handle"></div>
   <div class="sheet-head">
     <h2>🔐 Admin Mode</h2>
     <button type="button" id="adminDialogClose" class="icon-btn">✕</button>
   </div>
-  <div style="padding: 0 20px 24px; display:flex; flex-direction:column; gap:14px;">
-    <p style="margin:0; font-size:13.5px; color:var(--caption);">Masukkan password admin untuk aktifkan admin mode.</p>
+  <div style="padding: 0 20px 28px; display:flex; flex-direction:column; gap:14px;">
+    <p style="font-size:13px; color:var(--caption);">Masukkan password admin untuk aktifkan admin mode.</p>
     <div class="field">
       <label for="adminPassword">Password Admin</label>
       <input type="password" id="adminPassword" placeholder="••••••••" />
     </div>
-    <div id="adminError" class="form-error" hidden>Password salah.</div>
+    <div id="adminError" class="form-error" hidden>Password salah. Cuba lagi.</div>
     <button type="button" id="adminUnlockBtn" class="submit-btn">Unlock Admin Mode</button>
   </div>
 </dialog>
 
-<!-- ===== MAIN APP ===== -->
+<!-- MAIN APP -->
 <div id="app" hidden>
 
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span id="appLogo" class="brand-mark">⛽</span>
+        <span id="appLogo" class="brand-mark">🐢</span>
         <span class="brand-name">Minyak Tracker</span>
         <span id="adminBadge" class="admin-badge" hidden>ADMIN</span>
       </div>
       <div class="month-switcher">
         <button type="button" class="chev" data-dir="-1">‹</button>
-        <span id="monthText">Jun 2026</span>
+        <span id="monthText">Jul 2026</span>
         <button type="button" class="chev" data-dir="1">›</button>
       </div>
     </div>
@@ -96,13 +101,11 @@
       </div>
       <div class="legend">
         <div class="legend-item">
-          <span class="dot dot-diesel"></span>
-          <span class="legend-label">Diesel</span>
+          <span class="legend-label"><span class="dot dot-diesel"></span> Diesel</span>
           <span class="legend-value" id="dieselTotal">RM0</span>
         </div>
         <div class="legend-item">
-          <span class="dot dot-ron"></span>
-          <span class="legend-label">RON95 (Boat)</span>
+          <span class="legend-label"><span class="dot dot-ron"></span> RON95 (Boat)</span>
           <span class="legend-value" id="ronTotal">RM0</span>
         </div>
       </div>
@@ -125,9 +128,9 @@
         <span class="history-count" id="historyCount"></span>
       </div>
       <div id="emptyState" class="empty-state" hidden>
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon">🐢</div>
         <p class="empty-title">Takde rekod bulan ni</p>
-        <p class="empty-sub">Tekan butang + untuk tambah entry pertama awak.</p>
+        <p class="empty-sub">Tekan butang + untuk tambah entry pertama.</p>
       </div>
       <ul id="historyList" class="history-list"></ul>
     </section>
@@ -159,20 +162,18 @@
           </button>
         </div>
       </div>
-      <div id="odoFields" class="odo-fields">
-        <div class="field-row">
-          <div class="field">
-            <label for="odoStart">Odometer Mula <span class="optional">(km)</span></label>
-            <input type="number" id="odoStart" inputmode="decimal" step="0.1" placeholder="12345" />
-          </div>
-          <div class="field">
-            <label for="odoEnd">Odometer Akhir <span class="optional">(km)</span></label>
-            <input type="number" id="odoEnd" inputmode="decimal" step="0.1" placeholder="12400" />
-          </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="odoStart">Odometer Mula <span class="optional">(km)</span></label>
+          <input type="number" id="odoStart" inputmode="decimal" step="0.1" placeholder="12345" />
         </div>
-        <div class="distance-preview" id="distancePreview" hidden>
-          Jarak: <strong id="distanceValue">0</strong> km
+        <div class="field">
+          <label for="odoEnd">Odometer Akhir <span class="optional">(km)</span></label>
+          <input type="number" id="odoEnd" inputmode="decimal" step="0.1" placeholder="12400" />
         </div>
+      </div>
+      <div class="distance-preview" id="distancePreview" hidden>
+        Jarak: <strong id="distanceValue">0</strong> km
       </div>
       <div class="field">
         <label for="entryAmount">Amount Dibayar (RM)</label>
@@ -222,7 +223,7 @@
   <div id="toast" class="toast" hidden></div>
 </div>
 
-<script src="config.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="config.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
