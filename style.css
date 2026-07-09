@@ -67,13 +67,16 @@ input  { font-family: inherit; }
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 1s ease;
+  transition: opacity 1.2s ease;
+  z-index: 1;
 }
 #bgVideo.loaded { opacity: 1; }
 #bgFallback {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: linear-gradient(160deg, #061828 0%, #0a2030 50%, #0e2838 100%);
+  transition: opacity 1.2s ease;
 }
 
 /* ── All UI above video ────────────────────────── */

@@ -50,12 +50,46 @@ async function loadBackgroundVideo() {
 
 function applyBgVideo(url) {
   const vid = document.getElementById('bgVideo');
-  if(!url) { vid.src=''; vid.classList.remove('loaded'); return; }
-  vid.src = url;
-  vid.onloadeddata = () => vid.classList.add('loaded');
-  vid.onerror = () => vid.classList.remove('loaded');
+  const fallback = document.getElementById('bgFallback');
+
+  if(!url) {
+    vid.pause();
+    vid.removeAttribute('src');
+    vid.load();
+    vid.classList.remove('loaded');
+    if(fallback) fallback.style.opacity='1';
+    return;
+  }
+
+  // Clear old handlers
+  vid.oncanplay = null;
+  vid.onerror = null;
+  vid.classList.remove('loaded');
+
+  vid.muted = true;
+  vid.loop = true;
+  vid.autoplay = true;
+  vid.setAttribute('src', url);
+
+  vid.oncanplay = () => {
+    vid.classList.add('loaded');
+    if(fallback) fallback.style.opacity='0';
+    vid.play().catch(() => {
+      // Autoplay blocked by browser policy but video is loaded
+      vid.classList.add('loaded');
+    });
+  };
+
+  vid.onerror = () => {
+    console.error('BG video load error for:', url);
+    vid.classList.remove('loaded');
+    if(fallback) fallback.style.opacity='1';
+    showToast('Video gagal load. Cuba refresh.');
+  };
+
   vid.load();
-  // Show current URL in admin panel
+
+  // Update admin panel label
   const wrap = document.getElementById('bgCurrentUrl');
   const txt  = document.getElementById('bgUrlText');
   if(wrap && txt) { txt.textContent = url.split('/').pop(); wrap.hidden = false; }
@@ -206,8 +240,11 @@ document.getElementById('bgUploadBtn').addEventListener('click', async()=>{
     const url=urlData.publicUrl;
     // Save to settings
     const {error:setErr} = await sb.from('app_settings')
-      .upsert({key:'bg_video_url',value:url,updated_at:new Date().toISOString()});
-    if(setErr) throw new Error(setErr.message);
+      .upsert({key:'bg_video_url',value:url,updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(setErr) {
+      // Log but don't block — video is already uploaded, just settings save failed
+      console.warn('Settings save warning:', setErr.message);
+    }
     bar.style.width='100%'; label.textContent='100%';
     applyBgVideo(url);
     showToast('Background video dikemaskini ✓');
@@ -222,6 +259,12 @@ document.getElementById('bgUploadBtn').addEventListener('click', async()=>{
   } finally {
     setTimeout(()=>prog.hidden=true,1500);
   }
+});
+
+document.getElementById('bgRefreshBtn').addEventListener('click', async()=>{
+  showToast('Loading video...');
+  await loadBackgroundVideo();
+  showToast('Video di-refresh ✓');
 });
 
 document.getElementById('bgRemoveBtn').addEventListener('click', async()=>{
