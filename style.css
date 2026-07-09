@@ -415,6 +415,84 @@ dialog.sheet-dialog::backdrop { background:rgba(0,8,16,0.65); }
   .stat-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
+
+/* ── Text readability over video background ───── */
+/* Subtitle-style text shadow for all readable text */
+.topbar,
+.brand-name,
+.month-switcher,
+.user-email,
+.logout-btn,
+.history-head h2,
+.history-count,
+.stat-label,
+.stat-value,
+.gauge-sub,
+.gauge-total,
+.legend-label,
+.legend-value,
+.h-fuel-name,
+.h-amount,
+.h-date,
+.h-owner,
+.h-km,
+.empty-title,
+.empty-sub {
+  text-shadow:
+    0 1px 3px rgba(0,0,0,0.9),
+    0 0 6px rgba(0,0,0,0.7),
+    1px 1px 0 rgba(0,0,0,0.8),
+    -1px -1px 0 rgba(0,0,0,0.5);
+}
+
+/* Stronger shadow for hero numbers */
+.gauge-total {
+  text-shadow:
+    0 2px 6px rgba(0,0,0,0.95),
+    0 0 12px rgba(0,0,0,0.8),
+    1px 1px 0 rgba(0,0,0,0.9),
+    -1px 1px 0 rgba(0,0,0,0.9) !important;
+}
+.stat-value {
+  text-shadow:
+    0 2px 5px rgba(0,0,0,0.95),
+    0 0 10px rgba(0,0,0,0.8),
+    1px 1px 0 rgba(0,0,0,0.9) !important;
+}
+
+/* History items — subtitle style */
+.h-fuel-name,
+.h-amount {
+  text-shadow:
+    0 1px 4px rgba(0,0,0,0.95),
+    0 0 8px rgba(0,0,0,0.8),
+    1px 1px 0 rgba(0,0,0,0.9),
+    -1px 1px 0 rgba(0,0,0,0.7) !important;
+}
+
+/* Softer for secondary text */
+.h-date,
+.h-owner,
+.h-km,
+.stat-label,
+.legend-label,
+.gauge-sub,
+.history-count,
+.user-email {
+  text-shadow:
+    0 1px 3px rgba(0,0,0,0.9),
+    0 0 6px rgba(0,0,0,0.7) !important;
+}
+
+/* Section headers */
+.history-head h2 {
+  text-shadow:
+    0 2px 5px rgba(0,0,0,0.95),
+    0 0 10px rgba(0,0,0,0.8),
+    1px 1px 0 rgba(0,0,0,0.9),
+    -1px -1px 0 rgba(0,0,0,0.6) !important;
+}
+
 /* ── Reduced motion ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   dialog.sheet-dialog,.toast,.success-turtle,.login-card { animation: none; transition: none; }
