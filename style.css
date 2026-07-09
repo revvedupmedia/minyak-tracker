@@ -416,61 +416,66 @@ dialog.sheet-dialog::backdrop { background:rgba(0,8,16,0.65); }
 }
 
 
-/* ── Text readability over video background ───── */
-/* Subtitle-style text shadow for all readable text */
-.topbar,
+
+/* ── Subtitle-style text outline ─────────────── */
+/* White text with black outline — readable over any background */
+/* Uses paint-order so stroke goes behind fill (proper subtitle look) */
+
+/* Apply to ALL text elements in the app */
+#app *,
+#loginScreen *,
+#loginSuccess * {
+  -webkit-text-stroke: 0; /* reset first */
+}
+
+/* Main readable text — white with black outline */
 .brand-name,
-.month-switcher,
-.user-email,
-.logout-btn,
-.history-head h2,
-.history-count,
+.gauge-total,
+.gauge-sub,
+.legend-value,
+.legend-label,
 .stat-label,
 .stat-value,
-.gauge-sub,
-.gauge-total,
-.legend-label,
-.legend-value,
+.history-head h2,
+.history-count,
 .h-fuel-name,
 .h-amount,
 .h-date,
 .h-owner,
 .h-km,
 .empty-title,
-.empty-sub {
-  text-shadow:
-    0 1px 3px rgba(0,0,0,0.9),
-    0 0 6px rgba(0,0,0,0.7),
-    1px 1px 0 rgba(0,0,0,0.8),
-    -1px -1px 0 rgba(0,0,0,0.5);
+.empty-sub,
+.user-email,
+#monthText,
+.login-title,
+.login-org,
+.login-sub,
+.success-text {
+  color: #FFFFFF;
+  -webkit-text-stroke: 2.5px #000000;
+  paint-order: stroke fill;
+  text-shadow: none;
 }
 
-/* Stronger shadow for hero numbers */
+/* Larger text gets thicker stroke */
 .gauge-total {
-  text-shadow:
-    0 2px 6px rgba(0,0,0,0.95),
-    0 0 12px rgba(0,0,0,0.8),
-    1px 1px 0 rgba(0,0,0,0.9),
-    -1px 1px 0 rgba(0,0,0,0.9) !important;
+  -webkit-text-stroke: 3.5px #000000 !important;
+  paint-order: stroke fill !important;
 }
+
 .stat-value {
-  text-shadow:
-    0 2px 5px rgba(0,0,0,0.95),
-    0 0 10px rgba(0,0,0,0.8),
-    1px 1px 0 rgba(0,0,0,0.9) !important;
+  -webkit-text-stroke: 3px #000000 !important;
+  paint-order: stroke fill !important;
 }
 
-/* History items — subtitle style */
-.h-fuel-name,
-.h-amount {
-  text-shadow:
-    0 1px 4px rgba(0,0,0,0.95),
-    0 0 8px rgba(0,0,0,0.8),
-    1px 1px 0 rgba(0,0,0,0.9),
-    -1px 1px 0 rgba(0,0,0,0.7) !important;
+.history-head h2,
+.h-amount,
+.h-fuel-name {
+  -webkit-text-stroke: 2.5px #000000 !important;
+  paint-order: stroke fill !important;
 }
 
-/* Softer for secondary text */
+/* Smaller / muted text — thinner stroke */
 .h-date,
 .h-owner,
 .h-km,
@@ -479,21 +484,32 @@ dialog.sheet-dialog::backdrop { background:rgba(0,8,16,0.65); }
 .gauge-sub,
 .history-count,
 .user-email {
-  text-shadow:
-    0 1px 3px rgba(0,0,0,0.9),
-    0 0 6px rgba(0,0,0,0.7) !important;
+  -webkit-text-stroke: 1.5px #000000 !important;
+  paint-order: stroke fill !important;
+  color: rgba(255,255,255,0.85) !important;
 }
 
-/* Section headers */
-.history-head h2 {
-  text-shadow:
-    0 2px 5px rgba(0,0,0,0.95),
-    0 0 10px rgba(0,0,0,0.8),
-    1px 1px 0 rgba(0,0,0,0.9),
-    -1px -1px 0 rgba(0,0,0,0.6) !important;
+/* Claim pills & badges — keep their own colors but add outline */
+.h-claim-pill,
+.admin-badge {
+  -webkit-text-stroke: 1px rgba(0,0,0,0.6);
+  paint-order: stroke fill;
+}
+
+/* Month switcher text */
+#monthText {
+  -webkit-text-stroke: 2px #000000 !important;
+  paint-order: stroke fill !important;
+}
+
+/* Topbar — slightly dark bg so just light stroke is enough */
+.logout-btn {
+  -webkit-text-stroke: 1px rgba(0,0,0,0.5);
+  paint-order: stroke fill;
 }
 
 /* ── Reduced motion ───────────────────────────── */
+ ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   dialog.sheet-dialog,.toast,.success-turtle,.login-card { animation: none; transition: none; }
   .gauge-seg { transition: none; }
