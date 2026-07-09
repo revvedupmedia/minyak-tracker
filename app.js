@@ -1,567 +1,482 @@
 // ===========================================
-// Minyak Tracker v4 — Auth + Admin Mode
+// Minyak Tracker v5 — Auth + Admin BG Video
 // ===========================================
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const MONTH_NAMES = [
-  "Januari","Februari","Mac","April","Mei","Jun",
-  "Julai","Ogos","September","Oktober","November","Disember"
-];
-
-const ADMIN_SECRET = "GMRBAH7";
+const MONTH_NAMES = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+const ADMIN_SECRET = 'GMRBAH7';
 
 let state = {
   viewDate: new Date(),
   entries: [],
-  selectedFuel: "diesel",
+  selectedFuel: 'diesel',
   pendingFile: null,
   currentUser: null,
   isAdmin: false,
+  adminUnlocked: false,
+  pendingBgFile: null,
 };
 
-// ---------- Helpers ----------
+// ── Helpers ──────────────────────────────────────
 function toLocalDateStr(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-
 function fmtRM(n) {
-  const v = Number(n || 0);
-  return "RM" + v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return 'RM'+Number(n||0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-
-function fmtKm(n) {
-  return Number(n || 0).toLocaleString("en-MY", { maximumFractionDigits: 1 });
+function fmtKm(n) { return Number(n||0).toLocaleString('en-MY',{maximumFractionDigits:1}); }
+function fmtDateShort(s) { return new Date(s+'T00:00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short'}); }
+function fmtDateLong(s)  { return new Date(s+'T00:00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'long',year:'numeric'}); }
+function monthRange(d) {
+  const s=new Date(d.getFullYear(),d.getMonth(),1);
+  const e=new Date(d.getFullYear(),d.getMonth()+1,0);
+  return {start:toLocalDateStr(s),end:toLocalDateStr(e)};
 }
-
-function fmtDateShort(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("ms-MY", { day: "numeric", month: "short" });
-}
-
-function fmtDateLong(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("ms-MY", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function monthRange(date) {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
-}
-
 function showToast(msg) {
-  const toast = document.getElementById("toast");
-  toast.textContent = msg;
-  toast.hidden = false;
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.hidden=false;
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => { toast.hidden = true; }, 2200);
+  showToast._t=setTimeout(()=>{t.hidden=true;},2200);
 }
 
-// ---------- Auth ----------
+// ── Background Video ──────────────────────────────
+async function loadBackgroundVideo() {
+  try {
+    const {data} = await sb.from('app_settings').select('value').eq('key','bg_video_url').single();
+    if(data?.value) applyBgVideo(data.value);
+  } catch(_) {}
+}
+
+function applyBgVideo(url) {
+  const vid = document.getElementById('bgVideo');
+  if(!url) { vid.src=''; vid.classList.remove('loaded'); return; }
+  vid.src = url;
+  vid.onloadeddata = () => vid.classList.add('loaded');
+  vid.onerror = () => vid.classList.remove('loaded');
+  vid.load();
+  // Show current URL in admin panel
+  const wrap = document.getElementById('bgCurrentUrl');
+  const txt  = document.getElementById('bgUrlText');
+  if(wrap && txt) { txt.textContent = url.split('/').pop(); wrap.hidden = false; }
+}
+
+// ── Auth ──────────────────────────────────────────
 async function initAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) { onLoggedIn(session.user); } else { showLoginScreen(); }
-  sb.auth.onAuthStateChange((_event, session) => {
-    if (session) { onLoggedIn(session.user); } else { onLoggedOut(); }
+  await loadBackgroundVideo();
+  const {data:{session}} = await sb.auth.getSession();
+  if(session) onLoggedIn(session.user); else showLoginScreen();
+  sb.auth.onAuthStateChange((_,session) => {
+    if(session) onLoggedIn(session.user); else onLoggedOut();
   });
 }
 
 function showLoginScreen() {
-  document.getElementById("loginScreen").hidden = false;
-  document.getElementById("app").hidden = true;
+  document.getElementById('loginScreen').hidden = false;
+  document.getElementById('app').hidden = true;
 }
 
 function onLoggedIn(user) {
   state.currentUser = user;
-
-  // Show turtle success animation, then reveal app
-  const loginScreen = document.getElementById("loginScreen");
-  const successScreen = document.getElementById("loginSuccess");
-  const appEl = document.getElementById("app");
-
-  loginScreen.hidden = true;
-
-  // Only show animation if coming from a fresh login (not a page refresh)
-  if (!appEl.dataset.wasShown) {
-    successScreen.hidden = false;
-    appEl.hidden = true;
-    // After animation finishes (1.6s + 0.4s fade = 2s total), hide overlay and show app
-    setTimeout(() => {
-      successScreen.hidden = true;
-      appEl.hidden = false;
-      appEl.dataset.wasShown = "1";
-      document.getElementById("userEmailDisplay").textContent = user.email;
-      loadEntries();
-    }, 2000);
+  const app = document.getElementById('app');
+  document.getElementById('loginScreen').hidden = true;
+  document.getElementById('userEmailDisplay').textContent = user.email;
+  // Success animation
+  if(!app.dataset.shown) {
+    const suc = document.getElementById('loginSuccess');
+    suc.hidden = false; app.hidden = true;
+    setTimeout(() => { suc.hidden=true; app.hidden=false; app.dataset.shown='1'; loadEntries(); }, 2000);
   } else {
-    successScreen.hidden = true;
-    appEl.hidden = false;
-    document.getElementById("userEmailDisplay").textContent = user.email;
-    loadEntries();
+    app.hidden = false; loadEntries();
   }
 }
 
 function onLoggedOut() {
-  state.currentUser = null;
-  state.isAdmin = false;
-  // Clear admin badge
-  document.getElementById("adminBadge").hidden = true;
-  // Clear the "was shown" flag so animation plays again on next login
-  const appEl = document.getElementById("app");
-  delete appEl.dataset.wasShown;
-  appEl.hidden = true;
+  state.currentUser = null; state.isAdmin = false; state.adminUnlocked = false;
+  document.getElementById('adminBadge').hidden = true;
+  const app = document.getElementById('app');
+  delete app.dataset.shown; app.hidden = true;
   showLoginScreen();
 }
 
-document.getElementById("loginBtn").addEventListener("click", async () => {
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value;
-  const errEl = document.getElementById("loginError");
-  const btn = document.getElementById("loginBtn");
-  errEl.hidden = true;
-  btn.disabled = true;
-  btn.textContent = "Log masuk...";
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { errEl.textContent = "Email atau password salah. Cuba lagi."; errEl.hidden = false; }
-  btn.disabled = false;
-  btn.textContent = "Log Masuk";
+// Login form
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPassword').value;
+  const err=document.getElementById('loginError');
+  const btn=document.getElementById('loginBtn');
+  err.hidden=true; btn.disabled=true; btn.textContent='Log masuk...';
+  const {error} = await sb.auth.signInWithPassword({email,password:pass});
+  if(error){err.textContent='Email atau password salah.';err.hidden=false;}
+  btn.disabled=false; btn.textContent='Log Masuk';
 });
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginBtn').click();});
+document.getElementById('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPassword').focus();});
+document.getElementById('logoutBtn').addEventListener('click',()=>sb.auth.signOut());
 
-document.getElementById("loginPassword").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("loginBtn").click();
-});
-document.getElementById("loginEmail").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("loginPassword").focus();
-});
-
-document.getElementById("logoutBtn").addEventListener("click", () => sb.auth.signOut());
-
-// ---------- Admin cheat code — tap logo 7x ----------
-let logoTapCount = 0;
-let logoTapTimer = null;
-
-["loginLogo", "appLogo"].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener("click", () => {
-    logoTapCount++;
-    clearTimeout(logoTapTimer);
-    logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 2000);
-    if (logoTapCount >= 7) {
-      logoTapCount = 0;
-      if (state.isAdmin) {
-        state.isAdmin = false;
-        document.getElementById("adminBadge").hidden = true;
-        showToast("Admin mode dimatikan");
-        renderHistory();
-      } else {
-        openAdminDialog();
-      }
+// ── Admin Cheat Code — tap logo 7x ───────────────
+let logoTaps=0, logoTimer=null;
+['loginLogo','appLogo'].forEach(id => {
+  const el=document.getElementById(id); if(!el)return;
+  el.addEventListener('click',()=>{
+    logoTaps++; clearTimeout(logoTimer);
+    logoTimer=setTimeout(()=>logoTaps=0,2000);
+    if(logoTaps>=7){
+      logoTaps=0;
+      if(state.isAdmin){
+        state.isAdmin=false; state.adminUnlocked=false;
+        document.getElementById('adminBadge').hidden=true;
+        showToast('Admin mode dimatikan');
+      } else { openAdminDialog(); }
     }
   });
 });
 
-const adminDialog = document.getElementById("adminDialog");
-document.getElementById("adminDialogClose").addEventListener("click", () => adminDialog.close());
-adminDialog.addEventListener("click", (e) => { if (e.target === adminDialog) adminDialog.close(); });
+const adminDialog = document.getElementById('adminDialog');
+document.getElementById('adminDialogClose').addEventListener('click',()=>adminDialog.close());
+adminDialog.addEventListener('click',e=>{if(e.target===adminDialog)adminDialog.close();});
 
 function openAdminDialog() {
-  if (addDialog && addDialog.open) addDialog.close();
-  if (detailDialog && detailDialog.open) detailDialog.close();
-  document.getElementById("adminPassword").value = "";
-  document.getElementById("adminError").hidden = true;
+  if(addDialog.open)addDialog.close();
+  if(detailDialog.open)detailDialog.close();
+  // Reset to lock screen if not yet unlocked
+  if(!state.adminUnlocked){
+    document.getElementById('adminLockSection').hidden=false;
+    document.getElementById('adminToolSection').hidden=true;
+    document.getElementById('adminPassword').value='';
+    document.getElementById('adminError').hidden=true;
+  }
   adminDialog.showModal();
-  setTimeout(() => document.getElementById("adminPassword").focus(), 100);
+  if(!state.adminUnlocked) setTimeout(()=>document.getElementById('adminPassword').focus(),100);
 }
 
-document.getElementById("adminUnlockBtn").addEventListener("click", () => {
-  const pw = document.getElementById("adminPassword").value;
-  if (pw === ADMIN_SECRET) {
-    state.isAdmin = true;
-    document.getElementById("adminBadge").hidden = false;
-    adminDialog.close();
-    showToast("Admin mode aktif");
-    renderHistory();
+document.getElementById('adminUnlockBtn').addEventListener('click',()=>{
+  const pw=document.getElementById('adminPassword').value;
+  if(pw===ADMIN_SECRET){
+    state.adminUnlocked=true; state.isAdmin=true;
+    document.getElementById('adminBadge').hidden=false;
+    document.getElementById('adminLockSection').hidden=true;
+    document.getElementById('adminToolSection').hidden=false;
+    document.getElementById('adminError').hidden=true;
+    // Load current bg info
+    loadBackgroundVideo();
   } else {
-    document.getElementById("adminError").hidden = false;
-    document.getElementById("adminPassword").value = "";
-    document.getElementById("adminPassword").focus();
+    document.getElementById('adminError').hidden=false;
+    document.getElementById('adminPassword').value='';
+    document.getElementById('adminPassword').focus();
+  }
+});
+document.getElementById('adminPassword').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('adminUnlockBtn').click();});
+
+// ── Admin: Background Video Upload ───────────────
+const videoDrop = document.getElementById('videoDrop');
+const bgVideoFile = document.getElementById('bgVideoFile');
+
+videoDrop.addEventListener('click',e=>{if(e.target.id!=='bgVideoFile')bgVideoFile.click();});
+bgVideoFile.addEventListener('change',()=>{
+  const file=bgVideoFile.files[0]; if(!file)return;
+  if(file.size>52428800){showToast('Video terlalu besar (max 50MB)');return;}
+  state.pendingBgFile=file;
+  document.getElementById('videoDropEmpty').hidden=true;
+  document.getElementById('videoDropPreview').hidden=false;
+  document.getElementById('videoFileName').textContent=file.name;
+  document.getElementById('bgUploadBtn').disabled=false;
+});
+
+document.getElementById('bgUploadBtn').addEventListener('click', async()=>{
+  if(!state.pendingBgFile)return;
+  const btn=document.getElementById('bgUploadBtn');
+  const msg=document.getElementById('bgMsg');
+  const prog=document.getElementById('bgUploadProgress');
+  const bar=document.getElementById('bgUploadBar');
+  const label=document.getElementById('bgUploadLabel');
+  btn.disabled=true; btn.textContent='Uploading...';
+  msg.hidden=true; prog.hidden=false; bar.style.width='0%'; label.textContent='0%';
+
+  try {
+    const file=state.pendingBgFile;
+    const ext=file.name.split('.').pop();
+    const path=`bg_${Date.now()}.${ext}`;
+    // Upload with progress simulation (Supabase JS v2 doesn't have upload progress natively)
+    bar.style.width='30%'; label.textContent='30%';
+    const {error:upErr} = await sb.storage.from('backgrounds').upload(path,file,{upsert:true});
+    if(upErr) throw new Error(upErr.message);
+    bar.style.width='80%'; label.textContent='80%';
+    const {data:urlData} = sb.storage.from('backgrounds').getPublicUrl(path);
+    const url=urlData.publicUrl;
+    // Save to settings
+    const {error:setErr} = await sb.from('app_settings')
+      .upsert({key:'bg_video_url',value:url,updated_at:new Date().toISOString()});
+    if(setErr) throw new Error(setErr.message);
+    bar.style.width='100%'; label.textContent='100%';
+    applyBgVideo(url);
+    showToast('Background video dikemaskini ✓');
+    state.pendingBgFile=null;
+    bgVideoFile.value='';
+    document.getElementById('videoDropEmpty').hidden=false;
+    document.getElementById('videoDropPreview').hidden=true;
+    btn.textContent='Upload Video'; btn.disabled=true;
+  } catch(err){
+    msg.textContent=err.message||'Upload gagal.'; msg.hidden=false;
+    btn.textContent='Upload Video'; btn.disabled=false;
+  } finally {
+    setTimeout(()=>prog.hidden=true,1500);
   }
 });
 
-document.getElementById("adminPassword").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("adminUnlockBtn").click();
+document.getElementById('bgRemoveBtn').addEventListener('click', async()=>{
+  if(!confirm('Buang background video?'))return;
+  const {error} = await sb.from('app_settings')
+    .upsert({key:'bg_video_url',value:'',updated_at:new Date().toISOString()});
+  if(!error){
+    applyBgVideo('');
+    document.getElementById('bgCurrentUrl').hidden=true;
+    showToast('Background dibuang');
+  }
 });
 
-// ---------- Data loading ----------
+// ── Data ──────────────────────────────────────────
 async function loadEntries() {
-  const { start, end } = monthRange(state.viewDate);
-  const { data, error } = await sb
-    .from("fuel_entries")
-    .select("*")
-    .gte("entry_date", start)
-    .lte("entry_date", end)
-    .order("entry_date", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) { console.error(error); showToast("Gagal load data."); return; }
-  state.entries = data || [];
+  const {start,end}=monthRange(state.viewDate);
+  const {data,error}=await sb.from('fuel_entries').select('*')
+    .gte('entry_date',start).lte('entry_date',end)
+    .order('entry_date',{ascending:false}).order('created_at',{ascending:false});
+  if(error){showToast('Gagal load data.');return;}
+  state.entries=data||[];
   render();
 }
 
-// ---------- Rendering ----------
-function render() {
-  renderMonthLabel();
-  renderGauge();
-  renderStats();
-  renderHistory();
+function render(){
+  document.getElementById('monthText').textContent=`${MONTH_NAMES[state.viewDate.getMonth()]} ${state.viewDate.getFullYear()}`;
+  renderGauge(); renderStats(); renderHistory();
 }
 
-function renderMonthLabel() {
-  document.getElementById("monthText").textContent =
-    `${MONTH_NAMES[state.viewDate.getMonth()]} ${state.viewDate.getFullYear()}`;
+function renderGauge(){
+  const dT=sum('diesel'),rT=sum('ron95'),tot=dT+rT;
+  document.getElementById('gaugeTotal').textContent=fmtRM(tot);
+  document.getElementById('dieselTotal').textContent=fmtRM(dT);
+  document.getElementById('ronTotal').textContent=fmtRM(rT);
+  const cx=120,cy=130,r=90;
+  document.getElementById('gaugeTrack').setAttribute('d',arc(cx,cy,r,180,0));
+  if(tot<=0){document.getElementById('gaugeDiesel').setAttribute('d','');document.getElementById('gaugeRon').setAttribute('d','');return;}
+  const dEnd=180-(dT/tot*180);
+  document.getElementById('gaugeDiesel').setAttribute('d',arc(cx,cy,r,180,dEnd));
+  document.getElementById('gaugeRon').setAttribute('d',arc(cx,cy,r,dEnd,0));
+}
+function sum(ft){return state.entries.filter(e=>e.fuel_type===ft).reduce((a,e)=>a+Number(e.amount||0),0);}
+function polar(cx,cy,r,a){const rad=a*Math.PI/180;return{x:cx+r*Math.cos(rad),y:cy-r*Math.sin(rad)};}
+function arc(cx,cy,r,sa,ea){
+  if(Math.abs(sa-ea)<.01)return'';
+  const s=polar(cx,cy,r,sa),e=polar(cx,cy,r,ea);
+  return`M ${s.x} ${s.y} A ${r} ${r} 0 ${Math.abs(sa-ea)>180?1:0} 1 ${e.x} ${e.y}`;
 }
 
-function renderGauge() {
-  const dieselTotal = sumBy(state.entries, "diesel", "amount");
-  const ronTotal = sumBy(state.entries, "ron95", "amount");
-  const total = dieselTotal + ronTotal;
-  document.getElementById("gaugeTotal").textContent = fmtRM(total);
-  document.getElementById("dieselTotal").textContent = fmtRM(dieselTotal);
-  document.getElementById("ronTotal").textContent = fmtRM(ronTotal);
-  drawGaugeArc(dieselTotal, ronTotal);
+function renderStats(){
+  const km=state.entries.reduce((a,e)=>a+Number(e.distance_km||0),0);
+  document.getElementById('statMileage').innerHTML=`${fmtKm(km)} <span class="unit">km</span>`;
+  const pend=state.entries.filter(e=>e.needs_claim&&e.claim_status==='pending').reduce((a,e)=>a+Number(e.amount||0),0);
+  document.getElementById('statPending').textContent=fmtRM(pend);
 }
 
-function sumBy(entries, fuelType, field) {
-  return entries.filter(e => e.fuel_type === fuelType)
-    .reduce((acc, e) => acc + Number(e[field] || 0), 0);
-}
-
-function drawGaugeArc(dieselVal, ronVal) {
-  const cx = 120, cy = 130, r = 90;
-  const total = dieselVal + ronVal;
-  document.getElementById("gaugeTrack").setAttribute("d", arcPath(cx, cy, r, 180, 0));
-  if (total <= 0) {
-    document.getElementById("gaugeDiesel").setAttribute("d", "");
-    document.getElementById("gaugeRon").setAttribute("d", "");
-    return;
-  }
-  const dieselEndAngle = 180 - (dieselVal / total * 180);
-  document.getElementById("gaugeDiesel").setAttribute("d", arcPath(cx, cy, r, 180, dieselEndAngle));
-  document.getElementById("gaugeRon").setAttribute("d", arcPath(cx, cy, r, dieselEndAngle, 0));
-}
-
-function polarToCartesian(cx, cy, r, angleDeg) {
-  const rad = angleDeg * Math.PI / 180;
-  return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
-}
-
-function arcPath(cx, cy, r, sa, ea) {
-  if (Math.abs(sa - ea) < 0.01) return "";
-  const s = polarToCartesian(cx, cy, r, sa);
-  const e = polarToCartesian(cx, cy, r, ea);
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${Math.abs(sa - ea) > 180 ? 1 : 0} 1 ${e.x} ${e.y}`;
-}
-
-function renderStats() {
-  const totalKm = state.entries.reduce((acc, e) => acc + Number(e.distance_km || 0), 0);
-  document.getElementById("statMileage").innerHTML = `${fmtKm(totalKm)} <span class="unit">km</span>`;
-  const pendingTotal = state.entries
-    .filter(e => e.needs_claim && e.claim_status === "pending")
-    .reduce((acc, e) => acc + Number(e.amount || 0), 0);
-  document.getElementById("statPending").textContent = fmtRM(pendingTotal);
-}
-
-function renderHistory() {
-  const list = document.getElementById("historyList");
-  const empty = document.getElementById("emptyState");
-  const count = document.getElementById("historyCount");
-  list.innerHTML = "";
-
-  if (state.entries.length === 0) {
-    empty.hidden = false;
-    count.textContent = "";
-    return;
-  }
-  empty.hidden = true;
-  count.textContent = `${state.entries.length} entry`;
-
-  for (const entry of state.entries) {
-    const li = document.createElement("li");
-    const isDiesel = entry.fuel_type === "diesel";
-    const isOwner = state.currentUser && entry.user_id === state.currentUser.id;
-    const kmHtml = entry.distance_km ? `<span class="h-km">${fmtKm(entry.distance_km)} km</span>` : "";
-    const claimHtml = entry.needs_claim
-      ? `<span class="h-claim-pill ${entry.claim_status === "claimed" ? "claimed" : "pending"}">${entry.claim_status === "claimed" ? "Dah Claim" : "Pending"}</span>` : "";
-    const receiptDot = entry.receipt_url ? `<span class="h-receipt-dot">📎</span>` : "";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "history-item";
-    btn.innerHTML = `
-      <div class="h-fuel-badge ${isDiesel ? "diesel" : "ron"}">${isDiesel ? "🚗" : "🚤"}</div>
+function renderHistory(){
+  const list=document.getElementById('historyList');
+  const empty=document.getElementById('emptyState');
+  list.innerHTML='';
+  if(!state.entries.length){empty.hidden=false;document.getElementById('historyCount').textContent='';return;}
+  empty.hidden=true;
+  document.getElementById('historyCount').textContent=`${state.entries.length} entry`;
+  for(const entry of state.entries){
+    const li=document.createElement('li');
+    const isD=entry.fuel_type==='diesel';
+    const isOwner=state.currentUser&&entry.user_id===state.currentUser.id;
+    const kmH=entry.distance_km?`<span class="h-km">${fmtKm(entry.distance_km)} km</span>`:'';
+    const clH=entry.needs_claim?`<span class="h-claim-pill ${entry.claim_status==='claimed'?'claimed':'pending'}">${entry.claim_status==='claimed'?'Dah Claim':'Pending'}</span>`:'';
+    const recH=entry.receipt_url?'<span class="h-receipt-dot">📎</span>':'';
+    const btn=document.createElement('button');
+    btn.type='button'; btn.className='history-item';
+    btn.innerHTML=`
+      <div class="h-fuel-badge ${isD?'diesel':'ron'}">${isD?'🚗':'🚤'}</div>
       <div class="h-main">
         <div class="h-top">
-          <span class="h-fuel-name">${isDiesel ? "Diesel" : "RON95 (Boat)"}</span>
+          <span class="h-fuel-name">${isD?'Diesel':'RON95 (Boat)'}</span>
           <span class="h-amount">${fmtRM(entry.amount)}</span>
         </div>
         <div class="h-bottom">
           <div style="display:flex;flex-direction:column;gap:1px;">
             <span class="h-date">${fmtDateShort(entry.entry_date)}</span>
-            <span class="h-owner">${entry.user_email || ""}</span>
+            <span class="h-owner">${entry.user_email||''}</span>
           </div>
-          <div class="h-meta">${kmHtml}${receiptDot}${claimHtml}</div>
+          <div class="h-meta">${kmH}${recH}${clH}</div>
         </div>
-      </div>
-    `;
-    btn.addEventListener("click", () => openDetailDialog(entry, isOwner));
-    li.appendChild(btn);
-    list.appendChild(li);
+      </div>`;
+    btn.addEventListener('click',()=>openDetail(entry,isOwner));
+    li.appendChild(btn); list.appendChild(li);
   }
 }
 
-// ---------- Month nav ----------
-document.querySelectorAll(".chev").forEach(chev => {
-  chev.addEventListener("click", () => {
-    const dir = parseInt(chev.dataset.dir, 10);
-    state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + dir, 1);
+// Month nav
+document.querySelectorAll('.chev').forEach(c=>{
+  c.addEventListener('click',()=>{
+    const d=parseInt(c.dataset.dir,10);
+    state.viewDate=new Date(state.viewDate.getFullYear(),state.viewDate.getMonth()+d,1);
     loadEntries();
   });
 });
 
-// ---------- Add Entry dialog ----------
-const addDialog = document.getElementById("addDialog");
-const detailDialog = document.getElementById("detailDialog");
-const entryForm = document.getElementById("entryForm");
-const fuelToggle = document.getElementById("fuelToggle");
-const odoStart = document.getElementById("odoStart");
-const odoEnd = document.getElementById("odoEnd");
-const distancePreview = document.getElementById("distancePreview");
-const distanceValue = document.getElementById("distanceValue");
-const dropZone = document.getElementById("dropZone");
-const receiptFile = document.getElementById("receiptFile");
-const formError = document.getElementById("formError");
-const submitBtn = document.getElementById("submitBtn");
+// ── Add Entry ─────────────────────────────────────
+const addDialog=document.getElementById('addDialog');
+const detailDialog=document.getElementById('detailDialog');
+const odoStart=document.getElementById('odoStart');
+const odoEnd=document.getElementById('odoEnd');
+const submitBtn=document.getElementById('submitBtn');
+const formError=document.getElementById('formError');
 
-document.getElementById("fabAdd").addEventListener("click", openAddDialog);
-document.getElementById("addDialogClose").addEventListener("click", () => addDialog.close());
-document.getElementById("detailDialogClose").addEventListener("click", () => detailDialog.close());
-addDialog.addEventListener("click", (e) => { if (e.target === addDialog) addDialog.close(); });
-detailDialog.addEventListener("click", (e) => { if (e.target === detailDialog) detailDialog.close(); });
+document.getElementById('fabAdd').addEventListener('click',openAddDialog);
+document.getElementById('addDialogClose').addEventListener('click',()=>addDialog.close());
+document.getElementById('detailDialogClose').addEventListener('click',()=>detailDialog.close());
+addDialog.addEventListener('click',e=>{if(e.target===addDialog)addDialog.close();});
+detailDialog.addEventListener('click',e=>{if(e.target===detailDialog)detailDialog.close();});
 
-function openAddDialog() {
-  if (detailDialog.open) detailDialog.close();
-  state.pendingFile = null;
-  state.selectedFuel = "diesel";
-  entryForm.reset();
-  document.getElementById("entryDate").value = toLocalDateStr(new Date());
-  setFuelToggle("diesel");
-  resetDropZone();
-  formError.hidden = true;
-  submitBtn.disabled = false;
-  submitBtn.textContent = "Simpan Entry";
+function openAddDialog(){
+  if(detailDialog.open)detailDialog.close();
+  state.pendingFile=null; state.selectedFuel='diesel';
+  document.getElementById('entryForm').reset();
+  document.getElementById('entryDate').value=toLocalDateStr(new Date());
+  setFuel('diesel'); resetDrop(); formError.hidden=true;
+  submitBtn.disabled=false; submitBtn.textContent='Simpan Entry';
   addDialog.showModal();
 }
+function setFuel(f){
+  state.selectedFuel=f;
+  document.querySelectorAll('.fuel-opt').forEach(b=>b.classList.toggle('active',b.dataset.fuel===f));
+}
+document.getElementById('fuelToggle').addEventListener('click',e=>{const b=e.target.closest('.fuel-opt');if(b)setFuel(b.dataset.fuel);});
 
-function setFuelToggle(fuel) {
-  state.selectedFuel = fuel;
-  document.querySelectorAll(".fuel-opt").forEach(b => b.classList.toggle("active", b.dataset.fuel === fuel));
+odoStart.addEventListener('input',updateDist);
+odoEnd.addEventListener('input',updateDist);
+function updateDist(){
+  const s=parseFloat(odoStart.value),e=parseFloat(odoEnd.value);
+  const prev=document.getElementById('distancePreview');
+  if(!isNaN(s)&&!isNaN(e)&&e>=s){document.getElementById('distanceValue').textContent=fmtKm(e-s);prev.hidden=false;}
+  else prev.hidden=true;
 }
 
-fuelToggle.addEventListener("click", (e) => {
-  const btn = e.target.closest(".fuel-opt");
-  if (btn) setFuelToggle(btn.dataset.fuel);
-});
-
-odoStart.addEventListener("input", updateDistancePreview);
-odoEnd.addEventListener("input", updateDistancePreview);
-
-function updateDistancePreview() {
-  const s = parseFloat(odoStart.value), e = parseFloat(odoEnd.value);
-  if (!isNaN(s) && !isNaN(e) && e >= s) {
-    distanceValue.textContent = fmtKm(e - s);
-    distancePreview.hidden = false;
-  } else { distancePreview.hidden = true; }
+// Receipt file
+const dropZone=document.getElementById('dropZone');
+const receiptFile=document.getElementById('receiptFile');
+dropZone.addEventListener('click',e=>{if(e.target.id!=='removeFile')receiptFile.click();});
+receiptFile.addEventListener('change',()=>{const f=receiptFile.files[0];if(f){state.pendingFile=f;showFilePrev(f);}});
+document.getElementById('removeFile').addEventListener('click',e=>{e.stopPropagation();state.pendingFile=null;receiptFile.value='';resetDrop();});
+function resetDrop(){document.getElementById('dropZoneEmpty').hidden=false;document.getElementById('dropZonePreview').hidden=true;document.getElementById('previewImg').hidden=true;document.getElementById('previewPdf').hidden=true;}
+function showFilePrev(f){
+  document.getElementById('dropZoneEmpty').hidden=true;document.getElementById('dropZonePreview').hidden=false;
+  if(f.type==='application/pdf'){document.getElementById('previewImg').hidden=true;document.getElementById('previewPdf').hidden=false;document.getElementById('previewPdfName').textContent=f.name;}
+  else{const r=new FileReader();r.onload=ev=>{const i=document.getElementById('previewImg');i.src=ev.target.result;i.hidden=false;document.getElementById('previewPdf').hidden=true;};r.readAsDataURL(f);}
 }
 
-dropZone.addEventListener("click", (e) => { if (e.target.id !== "removeFile") receiptFile.click(); });
-receiptFile.addEventListener("change", () => {
-  const file = receiptFile.files[0];
-  if (file) { state.pendingFile = file; showFilePreview(file); }
-});
-document.getElementById("removeFile").addEventListener("click", (e) => {
-  e.stopPropagation();
-  state.pendingFile = null;
-  receiptFile.value = "";
-  resetDropZone();
-});
-
-function resetDropZone() {
-  document.getElementById("dropZoneEmpty").hidden = false;
-  document.getElementById("dropZonePreview").hidden = true;
-  document.getElementById("previewImg").hidden = true;
-  document.getElementById("previewPdf").hidden = true;
-}
-
-function showFilePreview(file) {
-  document.getElementById("dropZoneEmpty").hidden = true;
-  document.getElementById("dropZonePreview").hidden = false;
-  if (file.type === "application/pdf") {
-    document.getElementById("previewImg").hidden = true;
-    document.getElementById("previewPdf").hidden = false;
-    document.getElementById("previewPdfName").textContent = file.name;
-  } else {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = document.getElementById("previewImg");
-      img.src = ev.target.result;
-      img.hidden = false;
-      document.getElementById("previewPdf").hidden = true;
-    };
-    reader.readAsDataURL(file);
-  }
-}
-
-submitBtn.addEventListener("click", async () => {
-  formError.hidden = true;
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Menyimpan...";
-  try {
-    const date = document.getElementById("entryDate").value;
-    const amount = parseFloat(document.getElementById("entryAmount").value);
-    const needsClaim = document.getElementById("needsClaim").checked;
-    const notes = document.getElementById("entryNotes").value.trim();
-    const oStart = odoStart.value ? parseFloat(odoStart.value) : null;
-    const oEnd = odoEnd.value ? parseFloat(odoEnd.value) : null;
-
-    if (!date) throw new Error("Sila pilih tarikh.");
-    if (isNaN(amount) || amount <= 0) throw new Error("Sila masukkan amount yang sah.");
-    if (oStart !== null && oEnd !== null && oEnd < oStart)
-      throw new Error("Odometer akhir mesti lebih besar dari odometer mula.");
-
-    let receiptUrl = null, receiptPath = null;
-    if (state.pendingFile) {
-      const file = state.pendingFile;
-      const ext = file.name.split(".").pop();
-      const path = `${state.currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-      const { error: upErr } = await sb.storage.from("receipts").upload(path, file);
-      if (upErr) throw new Error("Gagal upload resit: " + upErr.message);
-      const { data: urlData } = sb.storage.from("receipts").getPublicUrl(path);
-      receiptUrl = urlData.publicUrl;
-      receiptPath = path;
+// Submit
+submitBtn.addEventListener('click',async()=>{
+  formError.hidden=true;submitBtn.disabled=true;submitBtn.textContent='Menyimpan...';
+  try{
+    const date=document.getElementById('entryDate').value;
+    const amount=parseFloat(document.getElementById('entryAmount').value);
+    const needsClaim=document.getElementById('needsClaim').checked;
+    const notes=document.getElementById('entryNotes').value.trim();
+    const oS=odoStart.value?parseFloat(odoStart.value):null;
+    const oE=odoEnd.value?parseFloat(odoEnd.value):null;
+    if(!date)throw new Error('Sila pilih tarikh.');
+    if(isNaN(amount)||amount<=0)throw new Error('Sila masukkan amount yang sah.');
+    if(oS!==null&&oE!==null&&oE<oS)throw new Error('Odometer akhir mesti lebih besar.');
+    let recUrl=null,recPath=null;
+    if(state.pendingFile){
+      const f=state.pendingFile,ext=f.name.split('.').pop();
+      const path=`${state.currentUser.id}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+      const{error:upE}=await sb.storage.from('receipts').upload(path,f);
+      if(upE)throw new Error('Gagal upload resit.');
+      recUrl=sb.storage.from('receipts').getPublicUrl(path).data.publicUrl;
+      recPath=path;
     }
-
-    const payload = {
-      entry_date: date,
-      fuel_type: state.selectedFuel,
-      odometer_start: oStart,
-      odometer_end: oEnd,
-      distance_km: (oStart !== null && oEnd !== null) ? oEnd - oStart : null,
-      amount,
-      needs_claim: needsClaim,
-      claim_status: needsClaim ? "pending" : "not_applicable",
-      notes: notes || null,
-      user_id: state.currentUser.id,
-      user_email: state.currentUser.email,
+    const payload={
+      entry_date:date,fuel_type:state.selectedFuel,
+      odometer_start:oS,odometer_end:oE,
+      distance_km:oS!==null&&oE!==null?oE-oS:null,
+      amount,needs_claim:needsClaim,
+      claim_status:needsClaim?'pending':'not_applicable',
+      notes:notes||null,user_id:state.currentUser.id,user_email:state.currentUser.email,
     };
-    if (receiptUrl) { payload.receipt_url = receiptUrl; payload.receipt_path = receiptPath; }
-
-    const { error: insErr } = await sb.from("fuel_entries").insert(payload);
-    if (insErr) throw new Error(insErr.message);
-
-    addDialog.close();
-    showToast("Entry disimpan ✓");
-    await loadEntries();
-  } catch (err) {
-    formError.textContent = err.message || "Ralat tidak diketahui.";
-    formError.hidden = false;
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Simpan Entry";
-  }
+    if(recUrl){payload.receipt_url=recUrl;payload.receipt_path=recPath;}
+    const{error:insE}=await sb.from('fuel_entries').insert(payload);
+    if(insE)throw new Error(insE.message);
+    addDialog.close();showToast('Entry disimpan ✓');await loadEntries();
+  }catch(err){formError.textContent=err.message||'Ralat.';formError.hidden=false;}
+  finally{submitBtn.disabled=false;submitBtn.textContent='Simpan Entry';}
 });
 
-// ---------- Detail dialog ----------
-const detailBody = document.getElementById("detailBody");
-const detailActions = document.getElementById("detailActions");
-let currentDetailEntry = null;
+// ── Detail ────────────────────────────────────────
+const detailBody=document.getElementById('detailBody');
+const detailActions=document.getElementById('detailActions');
+let curEntry=null;
 
-function openDetailDialog(entry, isOwner) {
-  if (addDialog.open) addDialog.close();
-  currentDetailEntry = entry;
-  const isDiesel = entry.fuel_type === "diesel";
-
-  let rows = [];
-  rows.push(row("Tarikh", fmtDateLong(entry.entry_date)));
-  rows.push(row("Dimasukkan oleh", entry.user_email || "—"));
-  rows.push(row("Jenis Minyak", isDiesel ? "Diesel" : "RON95 (Boat)"));
-  rows.push(row("Amount", fmtRM(entry.amount), true));
-  if (entry.odometer_start !== null && entry.odometer_end !== null) {
-    rows.push(row("Odometer Mula", fmtKm(entry.odometer_start) + " km", true));
-    rows.push(row("Odometer Akhir", fmtKm(entry.odometer_end) + " km", true));
-    rows.push(row("Jarak", fmtKm(entry.distance_km) + " km", true));
+function openDetail(entry,isOwner){
+  if(addDialog.open)addDialog.close();
+  curEntry=entry;
+  const isD=entry.fuel_type==='diesel';
+  const rows=[
+    row('Tarikh',fmtDateLong(entry.entry_date)),
+    row('Oleh',entry.user_email||'—'),
+    row('Jenis',isD?'Diesel':'RON95 (Boat)'),
+    row('Amount',fmtRM(entry.amount),true),
+  ];
+  if(entry.odometer_start!==null&&entry.odometer_end!==null){
+    rows.push(row('Odo Mula',fmtKm(entry.odometer_start)+' km',true));
+    rows.push(row('Odo Akhir',fmtKm(entry.odometer_end)+' km',true));
+    rows.push(row('Jarak',fmtKm(entry.distance_km)+' km',true));
   }
-  if (entry.needs_claim) rows.push(row("Status Claim", entry.claim_status === "claimed" ? "Dah Claim ✓" : "Pending"));
-  if (entry.notes) rows.push(row("Nota", entry.notes));
-
-  let receiptHtml = "";
-  if (entry.receipt_url) {
-    const isPdf = entry.receipt_url.toLowerCase().includes(".pdf");
-    receiptHtml = isPdf
-      ? `<a href="${entry.receipt_url}" target="_blank" rel="noopener" class="detail-receipt-link">📄 Buka Resit (PDF)</a>`
-      : `<img src="${entry.receipt_url}" class="detail-receipt" alt="Resit" />
-         <a href="${entry.receipt_url}" target="_blank" rel="noopener" class="detail-receipt-link" style="margin-top:8px;">⬇ Download Resit</a>`;
+  if(entry.needs_claim) rows.push(row('Claim',entry.claim_status==='claimed'?'Dah Claim ✓':'Pending'));
+  if(entry.notes) rows.push(row('Nota',entry.notes));
+  let recH='';
+  if(entry.receipt_url){
+    const isPdf=entry.receipt_url.toLowerCase().includes('.pdf');
+    recH=isPdf
+      ?`<a href="${entry.receipt_url}" target="_blank" rel="noopener" class="detail-receipt-link">📄 Buka Resit (PDF)</a>`
+      :`<img src="${entry.receipt_url}" class="detail-receipt" alt="Resit"/><a href="${entry.receipt_url}" target="_blank" rel="noopener" class="detail-receipt-link" style="margin-top:8px;">⬇ Download Resit</a>`;
   }
-
-  detailBody.innerHTML = rows.join("") + receiptHtml;
-
-  if (entry.needs_claim && isOwner) {
-    const isClaimed = entry.claim_status === "claimed";
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "detail-receipt-link";
-    toggleBtn.style.cssText = "margin-top:8px;width:100%;border:none;background:var(--success-soft);color:var(--success);cursor:pointer;";
-    toggleBtn.textContent = isClaimed ? "Tandakan sebagai Pending" : "Tandakan sebagai Dah Claim";
-    toggleBtn.addEventListener("click", async () => {
-      const { error } = await sb.from("fuel_entries")
-        .update({ claim_status: isClaimed ? "pending" : "claimed" }).eq("id", entry.id);
-      if (!error) { detailDialog.close(); showToast("Status dikemaskini ✓"); loadEntries(); }
+  detailBody.innerHTML=rows.join('')+recH;
+  // Claim toggle
+  if(entry.needs_claim&&isOwner){
+    const isClaimed=entry.claim_status==='claimed';
+    const tb=document.createElement('button');tb.type='button';tb.className='detail-receipt-link';
+    tb.style.cssText='margin-top:8px;width:100%;border:none;background:rgba(26,122,74,0.2);color:#4ACA7A;cursor:pointer;';
+    tb.textContent=isClaimed?'Tandakan Pending':'Tandakan Dah Claim';
+    tb.addEventListener('click',async()=>{
+      const{error}=await sb.from('fuel_entries').update({claim_status:isClaimed?'pending':'claimed'}).eq('id',entry.id);
+      if(!error){detailDialog.close();showToast('Status dikemaskini ✓');loadEntries();}
     });
-    detailBody.appendChild(toggleBtn);
+    detailBody.appendChild(tb);
   }
-
-  detailActions.innerHTML = "";
-  if (isOwner || state.isAdmin) {
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "danger-btn";
-    deleteBtn.textContent = (state.isAdmin && !isOwner) ? "🔐 Padam Entry (Admin)" : "Padam Entry";
-    deleteBtn.addEventListener("click", () => deleteEntry(entry));
-    detailActions.appendChild(deleteBtn);
+  // Actions
+  detailActions.innerHTML='';
+  if(isOwner||state.isAdmin){
+    const db=document.createElement('button');db.type='button';db.className='danger-btn';
+    db.textContent=(state.isAdmin&&!isOwner)?'🔐 Padam (Admin)':'Padam Entry';
+    db.addEventListener('click',()=>deleteEntry(entry));
+    detailActions.appendChild(db);
   }
-
   detailDialog.showModal();
 }
 
-function row(label, value, mono = false) {
-  return `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value ${mono ? "mono" : ""}">${value}</span></div>`;
+function row(l,v,m=false){return`<div class="detail-row"><span class="detail-label">${l}</span><span class="detail-value${m?' mono':''}">${v}</span></div>`;}
+
+async function deleteEntry(entry){
+  if(!confirm('Padam entry ni?'))return;
+  if(entry.receipt_path)await sb.storage.from('receipts').remove([entry.receipt_path]);
+  const{error}=await sb.from('fuel_entries').delete().eq('id',entry.id);
+  if(error){showToast('Gagal padam.');return;}
+  detailDialog.close();showToast('Entry dipadam');loadEntries();
 }
 
-async function deleteEntry(entry) {
-  if (!confirm("Padam entry ni? Tindakan ini tak boleh undo.")) return;
-  if (entry.receipt_path) await sb.storage.from("receipts").remove([entry.receipt_path]);
-  const { error } = await sb.from("fuel_entries").delete().eq("id", entry.id);
-  if (error) { showToast("Gagal padam entry."); return; }
-  detailDialog.close();
-  showToast("Entry dipadam");
-  loadEntries();
-}
+// ── Init ──────────────────────────────────────────
+if('serviceWorker' in navigator)
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
-// ---------- Init ----------
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
-}
 initAuth();
